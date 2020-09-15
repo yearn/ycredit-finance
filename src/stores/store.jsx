@@ -102,6 +102,7 @@ class Store {
         erc20address: config.stableCreditProtocolAddress,
         balance: 0,
         creditBalance: 0,
+        depositedBalance: 0,
         decimals: 8
       },
       connectorsByName: {
@@ -291,6 +292,11 @@ class Store {
         return accumulator + asset.creditBalance
       }, 0)
       datas[1].creditBalance = credit
+
+      const deposited = datas[0].reduce((accumulator, asset) => {
+        return accumulator + asset.depositedBalance
+      }, 0)
+      datas[1].depositedBalance = deposited
       store.setStore({ assets: datas[0] })
       store.setStore({ scAsset: datas[1] })
 
