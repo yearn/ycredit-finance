@@ -333,7 +333,7 @@ class Lending extends Component {
           <div className={ classes.between }>
           </div>
           <div className={ classes.titleBalance }>
-            <Typography variant={ 'h2' } noWrap>$ { scAsset.balance > scAsset.depositedBalance ? '0.00' : (scAsset.depositedBalance - scAsset.balance).toFixed(2) }</Typography>
+            <Typography variant={ 'h2' } noWrap>$ { scAsset.balance > scAsset.creditBalance ? '0.00' : (scAsset.creditBalance - scAsset.balance).toFixed(2) }</Typography>
             <Typography variant={ 'h4' } className={ classes.gray }>Borrowed</Typography>
           </div>
         </div>
