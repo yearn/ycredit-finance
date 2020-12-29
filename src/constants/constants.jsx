@@ -42,3 +42,6 @@ export const BORROW_RETURNED = 'BORROW_RETURNED'
 
 export const REPAY = 'REPAY'
 export const REPAY_RETURNED = 'REPAY_RETURNED'
+
+export const CLAIM = 'CLAIM'
+export const CLAIM_RETURNED = 'CLAIM_RETURNED'

@@ -20,6 +20,9 @@ import {
   WITHDRAW_RETURNED,
   GET_WITHDRAW_AMOUNT,
   WITHDRAW_AMOUNT_RETURNED,
+
+  CLAIM,
+  CLAIM_RETURNED
 } from '../../constants'
 
 import Store from "../../stores";
@@ -45,6 +48,7 @@ const styles = theme => ({
     paddingBottom: '12px',
     display: 'flex',
     flex: '1',
+    flexWrap: 'wrap',
     [theme.breakpoints.down('sm')]: {
       flexDirection: 'column'
     }
@@ -69,6 +73,10 @@ const styles = theme => ({
       borderBottom: 'none',
       margin: '0px'
     }
+  },
+  verticalSepperator: {
+    margin: '12px',
+    width: '100%'
   },
   scaleContainer: {
     display: 'flex',
@@ -156,6 +164,7 @@ class Asset extends Component {
     emitter.on(ERROR, this.errorReturned);
     emitter.on(DEPOSIT_AMOUNT_RETURNED, this.depositAmountReturned);
     emitter.on(WITHDRAW_AMOUNT_RETURNED, this.withdrawAmountReturned);
+    emitter.on(CLAIM_RETURNED, this.claimReturned);
   }
 
   componentWillUnmount() {
@@ -164,6 +173,7 @@ class Asset extends Component {
     emitter.removeListener(DEPOSIT_AMOUNT_RETURNED, this.depositAmountReturned);
     emitter.removeListener(WITHDRAW_AMOUNT_RETURNED, this.withdrawAmountReturned);
     emitter.removeListener(ERROR, this.errorReturned);
+    emitter.removeListener(CLAIM_RETURNED, this.claimReturned);
   };
 
   depositReturned = () => {
@@ -172,6 +182,10 @@ class Asset extends Component {
 
   withdrawReturned = (txHash) => {
     this.setState({ loading: false, redeemAmount: '' })
+  };
+
+  claimReturned = (txHash) => {
+    this.setState({ loading: false })
   };
 
   errorReturned = (error) => {
@@ -217,7 +231,6 @@ class Asset extends Component {
           disabled={ loading }
           placeholder="0.00"
           variant="outlined"
-          onKeyDown={ this.inputKeyDown }
         />
         <div className={ classes.scaleContainer }>
           <Button
@@ -282,7 +295,6 @@ class Asset extends Component {
           disabled={ loading }
           placeholder="0.00"
           variant="outlined"
-          onKeyDown={ this.inputRedeemKeyDown }
         />
         <div className={ classes.scaleContainer }>
           <Button
@@ -332,6 +344,17 @@ class Asset extends Component {
           </Button>
         </div>
       </div>
+      <div className={ classes.verticalSepperator }></div>
+      <Button
+        className={ classes.actionButton }
+        variant="contained"
+        color="primary"
+        disabled={ loading }
+        onClick={ this.onClaim }
+        fullWidth
+        >
+        <Typography className={ classes.buttonText } variant={ 'h5'}>Claim</Typography>
+      </Button>
     </div>)
   };
 
@@ -399,19 +422,13 @@ class Asset extends Component {
     const that = this
     const tar = event.target
 
-    window.setTimeout(() => {
-      if(tar.id === 'amount') {
-        that._getDepositAmouont()
-      } else if (tar.id === 'redeemAmount') {
-        that._getWithdrawAmount()
-      }
-    }, 100)
-  }
-
-  inputKeyDown = (event) => {
-    if (event.which === 13) {
-      this.onInvest();
-    }
+    // window.setTimeout(() => {
+    //   if(tar.id === 'amount') {
+    //     that._getDepositAmouont()
+    //   } else if (tar.id === 'redeemAmount') {
+    //     that._getWithdrawAmount()
+    //   }
+    // }, 100)
   }
 
   onDeposit = () => {
@@ -447,6 +464,17 @@ class Asset extends Component {
     dispatcher.dispatch({ type: WITHDRAW, content: { amount: redeemAmount, asset: asset } })
   }
 
+  onClaim = () => {
+    this.setState({ redeemAmountError: false })
+
+    const { asset, startLoading  } = this.props
+
+    this.setState({ loading: true })
+    startLoading()
+
+    dispatcher.dispatch({ type: CLAIM, content: { asset: asset } })
+  }
+
   setAmount = (percent) => {
     if(this.state.loading) {
       return
@@ -462,9 +490,9 @@ class Asset extends Component {
 
     const that = this
 
-    window.setTimeout(() => {
-      that._getDepositAmouont()
-    }, 100)
+    // window.setTimeout(() => {
+    //   that._getDepositAmouont()
+    // }, 100)
   }
 
   setRedeemAmount = (percent) => {
@@ -480,34 +508,34 @@ class Asset extends Component {
 
     const that = this
 
-    window.setTimeout(() => {
-      that._getWithdrawAmount()
-    }, 100)
+    // window.setTimeout(() => {
+    //   that._getWithdrawAmount()
+    // }, 100)
   }
 
-  _getDepositAmouont = () => {
-    const { asset } = this.props;
-    const { amount } = this.state
-
-    //add more validation
-    if(!amount) {
-      return false
-    }
-
-    dispatcher.dispatch({ type: GET_DEPOSIT_AMOUNT, content: { asset: asset, amount: amount } })
-  }
-
-  _getWithdrawAmount = () => {
-    const { asset } = this.props;
-    const { redeemAmount } = this.state
-
-    //add more validation
-    if(!redeemAmount) {
-      return false
-    }
-
-    dispatcher.dispatch({ type: GET_WITHDRAW_AMOUNT, content: { asset: asset, amount: redeemAmount } })
-  }
+  // _getDepositAmouont = () => {
+  //   const { asset } = this.props;
+  //   const { amount } = this.state
+  //
+  //   //add more validation
+  //   if(!amount) {
+  //     return false
+  //   }
+  //
+  //   dispatcher.dispatch({ type: GET_DEPOSIT_AMOUNT, content: { asset: asset, amount: amount } })
+  // }
+  //
+  // _getWithdrawAmount = () => {
+  //   const { asset } = this.props;
+  //   const { redeemAmount } = this.state
+  //
+  //   //add more validation
+  //   if(!redeemAmount) {
+  //     return false
+  //   }
+  //
+  //   dispatcher.dispatch({ type: GET_WITHDRAW_AMOUNT, content: { asset: asset, amount: redeemAmount } })
+  // }
 }
 
 export default withRouter(withStyles(styles, { withTheme: true })(Asset));

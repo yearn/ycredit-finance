@@ -23,7 +23,9 @@ import {
   BORROW,
   BORROW_RETURNED,
   REPAY,
-  REPAY_RETURNED
+  REPAY_RETURNED,
+  CLAIM,
+  CLAIM_RETURNED,
 } from '../constants';
 import Web3 from 'web3';
 
@@ -53,7 +55,8 @@ class Store {
   constructor() {
 
     this.store = {
-      assets: [
+      assets: [],
+      configAssets: [
         {
           id: 'USDT',
           name: 'USDT',
@@ -80,6 +83,46 @@ class Store {
           symbol: 'TUSD',
           description: 'TUSD',
           erc20address: '0x0000000000085d4780B73119b644AE5ecd22b376',
+          balance: 0,
+          depositedBalance: 0,
+          decimals: 18,
+        },
+        {
+          id: 'AAVE',
+          name: 'AAVE',
+          symbol: 'AAVE',
+          description: 'AAVE',
+          erc20address: '0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9',
+          balance: 0,
+          depositedBalance: 0,
+          decimals: 18,
+        },
+        {
+          id: 'SNX',
+          name: 'Synthetix',
+          symbol: 'SNX',
+          description: 'Synthetix',
+          erc20address: '0xc011a73ee8576fb46f5e1c5751ca3b9fe0af2a6f',
+          balance: 0,
+          depositedBalance: 0,
+          decimals: 18,
+        },
+        {
+          id: 'LINK',
+          name: 'ChainLink',
+          symbol: 'LINK',
+          description: 'ChainLink',
+          erc20address: '0x514910771af9ca656af840dff83e8264ecf986ca',
+          balance: 0,
+          depositedBalance: 0,
+          decimals: 18,
+        },
+        {
+          id: 'YFI',
+          name: 'Yearn.finance',
+          symbol: 'YFI',
+          description: 'Yearn.finance',
+          erc20address: '0x0bc529c00c6401aef6d220be8c6ea1667f6ad93e',
           balance: 0,
           depositedBalance: 0,
           decimals: 18,
@@ -152,6 +195,9 @@ class Store {
             break
           case REPAY:
             this.repay(payload);
+            break
+          case CLAIM:
+            this.claim(payload);
             break
           default: {
           }
@@ -238,7 +284,6 @@ class Store {
 
   getBalances = async () => {
     const account = store.getStore('account')
-    const assets = store.getStore('assets')
     const scAsset = store.getStore('scAsset')
 
     if(!account || !account.address) {
@@ -247,61 +292,110 @@ class Store {
 
     const web3 = await this._getWeb3Provider();
 
-    async.parallel([
-      (cb) => {
-        async.map(assets, (asset, callback) => {
-          async.parallel([
-            (callbackInner) => { this._getERC20Balance(web3, asset, account, callbackInner) },
-            (callbackInner) => { this._getDepositedBalance(web3, asset, account, callbackInner) },
-            (callbackInner) => { this._getscUSDBalance(web3, asset, account, callbackInner) },
-            (callbackInner) => { this._getCredit(web3, asset, account, callbackInner) },
-          ], (err, data) => {
-            asset.balance = data[0]
-            asset.depositedBalance = data[1] > 999999999999 ? 0 : data[1]
-            asset.scUSDBalance = data[2] > 999999999999 ? 0 : data[2]
-            asset.creditBalance = data[3]
+    this._getMarkets(web3, (err, assets) => {
 
-            callback(null, asset)
+      async.parallel([
+        (cb) => {
+          async.map(assets, (asset, callback) => {
+            async.parallel([
+              (callbackInner) => { this._getERC20Balance(web3, asset, account, callbackInner) },
+              (callbackInner) => { this._getscUSDBalance(web3, asset, account, callbackInner) },
+              // (callbackInner) => { this._getDepositedBalance(web3, asset, account, callbackInner) },
+              // (callbackInner) => { this._getCredit(web3, asset, account, callbackInner) },
+            ], (err, data) => {
+              asset.balance = data[0]
+              asset.depositedBalance = 0
+              asset.creditBalance = 0
+              asset.scUSDBalance = data[1]
+              // asset.depositedBalance = data[2] > 999999999999 ? 0 : data[2]
+              // asset.creditBalance = data[3]
+
+              callback(null, asset)
+            })
+          }, (err, assets) => {
+            if(err) {
+              return cb(err)
+            }
+
+            cb(null, assets)
           })
-        }, (err, assets) => {
-          if(err) {
-            return cb(err)
+        },
+        (cb) => {
+          this._getERC20Balance(web3, scAsset, account, (err, balance) => {
+            if(err) {
+              return cb(err)
+            }
+
+            scAsset.balance = balance
+
+            cb(null, scAsset)
+          })
+        }
+      ], (err, datas) => {
+        if(err) {
+          emitter.emit(SNACKBAR_ERROR, err)
+          return emitter.emit(ERROR, err)
+        }
+
+        const credit = datas[0].reduce((accumulator, asset) => {
+          return accumulator + (asset.creditBalance ? asset.creditBalance : 0)
+        }, 0)
+        datas[1].creditBalance = credit
+
+        const deposited = datas[0].reduce((accumulator, asset) => {
+          return accumulator + (asset.depositedBalance ? asset.depositedBalance : 0)
+        }, 0)
+        datas[1].depositedBalance = deposited
+        store.setStore({ assets: datas[0] })
+        store.setStore({ scAsset: datas[1] })
+
+        return emitter.emit(BALANCES_RETURNED)
+      })
+
+    });
+  }
+
+  _getMarkets = async (web3, callback) => {
+    const stableCreditProtocolContract = new web3.eth.Contract(config.stableCreditProtocolABI, config.stableCreditProtocolAddress)
+
+    const markets = await stableCreditProtocolContract.methods.markets().call()
+    const configAssets = store.getStore('configAssets')
+
+    const assets = markets.map(async (market) => {
+      let foundMarket = configAssets.filter((ca) => {
+        return ca.erc20address.toLowerCase() === market.toLowerCase()
+      })
+
+      if(foundMarket && foundMarket.length > 0) {
+        return foundMarket[0]
+      } else {
+        try {
+          const erc20Contract = new web3.eth.Contract(config.erc20ABI, market)
+
+          const symbol = await erc20Contract.methods.symbol().call();
+          const name = await erc20Contract.methods.name().call();
+          const decimals = await erc20Contract.methods.decimals().call();
+
+          return {
+            erc20address: market,
+            id: symbol,
+            symbol: symbol,
+            name: name,
+            description: name,
+            decimals: decimals,
+            balance: 0,
+            depositedBalance: 0,
           }
 
-          cb(null, assets)
-        })
-      },
-      (cb) => {
-        this._getERC20Balance(web3, scAsset, account, (err, balance) => {
-          if(err) {
-            return cb(err)
-          }
-
-          scAsset.balance = balance
-
-          cb(null, scAsset)
-        })
+        } catch(ex) {
+          console.log(ex)
+        }
       }
-    ], (err, datas) => {
-      if(err) {
-        emitter.emit(SNACKBAR_ERROR, err)
-        return emitter.emit(ERROR, err)
-      }
-
-      const credit = datas[0].reduce((accumulator, asset) => {
-        return accumulator + (asset.creditBalance ? asset.creditBalance : 0)
-      }, 0)
-      datas[1].creditBalance = credit
-
-      const deposited = datas[0].reduce((accumulator, asset) => {
-        return accumulator + (asset.depositedBalance ? asset.depositedBalance : 0)
-      }, 0)
-      datas[1].depositedBalance = deposited
-      store.setStore({ assets: datas[0] })
-      store.setStore({ scAsset: datas[1] })
-
-      return emitter.emit(BALANCES_RETURNED)
     })
+
+    Promise.all(assets).then((values) => {
+      callback(null, values)
+    });
   }
 
   _getERC20Balance = async (web3, asset, account, callback) => {
@@ -342,9 +436,9 @@ class Store {
 
   _getscUSDBalance = async (web3, asset, account, callback) => {
     try {
-      const stableCreditHelperContract = new web3.eth.Contract(config.stableCreditHelperABI, config.stableCreditHelperAddress)
+      const stableCreditProtocolContract = new web3.eth.Contract(config.stableCreditProtocolABI, config.stableCreditProtocolAddress)
 
-      var balance = await stableCreditHelperContract.methods.calculateBorrowMaxOf(account.address, asset.erc20address).call({ from: account.address });
+      var balance = await stableCreditProtocolContract.methods.collateralCredit(account.address, asset.erc20address).call({ from: account.address });
       callback(null, parseFloat(balance)/10**asset.decimals)
     } catch(ex) {
       console.log(ex)
@@ -682,6 +776,53 @@ class Store {
 
 
     stableCreditProtocolContract.methods.repayExactIn(assetAddress, amountToSend, amountToReceive).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
+    .on('transactionHash', function(hash){
+      emitter.emit(SNACKBAR_TRANSACTION_HASH, hash)
+      callback(null, hash)
+    })
+    .on('confirmation', function(confirmationNumber, receipt){
+      if(confirmationNumber === 2) {
+        emitter.emit(SNACKBAR_TRANSACTION_CONFIRMED, receipt.transactionHash)
+
+        dispatcher.dispatch({ type: GET_BALANCES, content: {} })
+      }
+    })
+    .on('receipt', function(receipt){
+      emitter.emit(SNACKBAR_TRANSACTION_RECEIPT, receipt.transactionHash)
+    })
+    .on('error', function(error) {
+      if(error.message) {
+        return callback(error.message)
+      }
+      callback(error)
+    })
+  }
+
+  claim = async (payload) => {
+    try {
+      const account = store.getStore('account')
+      const scDecimals = store.getStore('scAsset').decimals
+      const web3 = await this._getWeb3Provider();
+
+      this._claim(web3, account, (err, a) => {
+        if(err) {
+          emitter.emit(ERROR, err)
+          return emitter.emit(SNACKBAR_ERROR, err)
+        }
+
+        emitter.emit(CLAIM_RETURNED)
+      })
+
+    } catch (ex) {
+      emitter.emit(ERROR, ex)
+      emitter.emit(SNACKBAR_ERROR, ex)
+    }
+  }
+
+  _claim = async (web3, account, callback) => {
+    const stableCreditProtocolContract = new web3.eth.Contract(config.stableCreditProtocolABI, config.stableCreditProtocolAddress)
+
+    stableCreditProtocolContract.methods.claim().send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
     .on('transactionHash', function(hash){
       emitter.emit(SNACKBAR_TRANSACTION_HASH, hash)
       callback(null, hash)

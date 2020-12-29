@@ -15,7 +15,7 @@ import Disclaimer from './components/disclaimer';
 import SnackbarController from './components/snackbar';
 import Account from './components/account';
 import Collateral from './components/collateral';
-import Lending from './components/lending';
+// import Lending from './components/lending';
 
 import { injected } from "./stores/connectors";
 
@@ -97,13 +97,10 @@ class App extends Component {
             }}>
               <Header />
               <Switch>
-                <Route path="/lending">
-                  <Lending />
-                </Route>
                 <Route path="/collateral">
                   <Collateral />
                 </Route>
-                <Route path="/"> 
+                <Route path="/">
                   <Collateral />
                 </Route>
               </Switch>

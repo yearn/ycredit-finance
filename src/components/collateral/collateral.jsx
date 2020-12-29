@@ -20,7 +20,8 @@ import {
   CONNECTION_CONNECTED,
   CONNECTION_DISCONNECTED,
   DEPOSIT_RETURNED,
-  WITHDRAW_RETURNED
+  WITHDRAW_RETURNED,
+  CLAIM_RETURNED
 } from '../../constants'
 
 import Store from "../../stores";
@@ -313,6 +314,7 @@ class Collateral extends Component {
     emitter.on(CONNECTION_DISCONNECTED, this.connectionDisconnected);
     emitter.on(DEPOSIT_RETURNED, this.depositReturned);
     emitter.on(WITHDRAW_RETURNED, this.withdrawReturned);
+    emitter.on(CLAIM_RETURNED, this.claimReturned);
   }
 
   componentWillUnmount() {
@@ -322,6 +324,7 @@ class Collateral extends Component {
     emitter.removeListener(BALANCES_RETURNED, this.balancesReturned);
     emitter.removeListener(DEPOSIT_RETURNED, this.depositReturned);
     emitter.removeListener(WITHDRAW_RETURNED, this.withdrawReturned);
+    emitter.removeListener(CLAIM_RETURNED, this.claimReturned);
   };
 
   depositReturned = () => {
@@ -329,6 +332,10 @@ class Collateral extends Component {
   };
 
   withdrawReturned = (txHash) => {
+    this.setState({ loading: false })
+  };
+
+  claimReturned = (txHash) => {
     this.setState({ loading: false })
   };
 
@@ -379,12 +386,6 @@ class Collateral extends Component {
             <Typography variant={ 'h2' } noWrap>$ { scAsset.balance.toFixed(2) }</Typography>
             <Typography variant={ 'h4' } className={ classes.gray }>Credit available</Typography>
           </div>
-          <div className={ classes.between }>
-          </div>
-          <div className={ classes.titleBalance }>
-            <Typography variant={ 'h2' } noWrap>$ { scAsset.balance > scAsset.creditBalance ? '0.00' : (scAsset.creditBalance - scAsset.balance).toFixed(2) }</Typography>
-            <Typography variant={ 'h4' } className={ classes.gray }>Borrowed</Typography>
-          </div>
         </div>
         <div className={ classes.investedContainer }>
           { this.renderAssetBlocks() }
@@ -405,7 +406,7 @@ class Collateral extends Component {
     const { classes } = this.props
     const width = window.innerWidth
 
-    return assets.map((asset) => {
+    return assets.sort(this.sortAsses).map((asset) => {
       return (
         <Accordion className={ classes.expansionPanel } square key={ asset.id+"_expand" } expanded={ expanded === asset.id} onChange={ () => { this.handleChange(asset.id) } }>
           <AccordionSummary
@@ -418,7 +419,7 @@ class Collateral extends Component {
                 <div className={ classes.assetIcon }>
                   <img
                     alt=""
-                    src={ require('../../assets/tokens/'+asset.symbol+'-logo.png') }
+                    src={ this.getLogoForAsset(asset) }
                     height={ width > 600 ? '40px' : '30px'}
                     style={asset.disabled?{filter:'grayscale(100%)'}:{}}
                   />
@@ -444,6 +445,30 @@ class Collateral extends Component {
         </Accordion>
       )
     })
+  }
+
+  sortAsses = (a, b) => {
+    if (a.balance > b.balance) {
+      return -1
+    } else if (a.balance < b.balance) {
+      return 1
+    } else {
+      if(a.name > b.name) {
+        return 1
+      } else if(a.name < b.name) {
+        return -1
+      }
+
+      return 0
+    }
+  }
+
+  getLogoForAsset = (asset) => {
+    try {
+      return require('../../assets/tokens/'+asset.symbol+'-logo.png')
+    } catch {
+      return require('../../assets/tokens/unknown-logo.png')
+    }
   }
 
   handleChange = (id) => {

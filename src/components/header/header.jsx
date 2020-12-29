@@ -176,7 +176,7 @@ class Header extends Component {
           </div>
           <div className={ classes.links }>
             { this.renderLink('collateral') }
-            { this.renderLink('lending') }
+            { /* this.renderLink('lending') */ }
           </div>
           <div className={ classes.account }>
             { address &&
