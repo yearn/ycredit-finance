@@ -289,12 +289,12 @@ class Store {
       }
 
       const credit = datas[0].reduce((accumulator, asset) => {
-        return accumulator + asset.creditBalance
+        return accumulator + (asset.creditBalance ? asset.creditBalance : 0)
       }, 0)
       datas[1].creditBalance = credit
 
       const deposited = datas[0].reduce((accumulator, asset) => {
-        return accumulator + asset.depositedBalance
+        return accumulator + (asset.depositedBalance ? asset.depositedBalance : 0)
       }, 0)
       datas[1].depositedBalance = deposited
       store.setStore({ assets: datas[0] })
