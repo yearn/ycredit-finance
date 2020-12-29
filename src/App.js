@@ -103,7 +103,7 @@ class App extends Component {
                 <Route path="/collateral">
                   <Collateral />
                 </Route>
-                <Route path="/">
+                <Route path="/"> 
                   <Collateral />
                 </Route>
               </Switch>

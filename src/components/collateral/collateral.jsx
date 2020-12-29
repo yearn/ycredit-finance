@@ -6,15 +6,8 @@ import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
-  TextField,
-  InputAdornment,
-  FormControlLabel,
-  Checkbox,
-  Tooltip
 } from '@material-ui/core';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
-import SearchIcon from '@material-ui/icons/Search';
-import InfoIcon from '@material-ui/icons/Info';
 import { colors } from '../../theme'
 
 import Asset from './asset'
@@ -376,7 +369,7 @@ class Collateral extends Component {
     return (
       <div className={ classes.root }>
         <div className={ classes.portfolioContainer }>
-          <div className={ classes.titleBalance }> 
+          <div className={ classes.titleBalance }>
             <Typography variant={ 'h2' } noWrap>$ { scAsset.depositedBalance.toFixed(2) }</Typography>
             <Typography variant={ 'h4' } className={ classes.gray }>Collateral</Typography>
           </div>

@@ -6,7 +6,6 @@ import {
   TextField,
   MenuItem,
   Button,
-  CircularProgress
 } from '@material-ui/core';
 import { colors } from '../../theme'
 
@@ -307,8 +306,6 @@ class Lending extends Component {
     const {
       loading,
       account,
-      repayAmount,
-      repayAsset,
       activeTab,
       scAsset
     } = this.state
@@ -412,7 +409,6 @@ class Lending extends Component {
       classes
     } = this.props
     const {
-      loading,
       calculatedRepayAmount,
       repayAsset
     } = this.state
@@ -441,7 +437,6 @@ class Lending extends Component {
       classes
     } = this.props
     const {
-      loading,
       calculatedBorrowAmount,
       borrowAsset
     } = this.state

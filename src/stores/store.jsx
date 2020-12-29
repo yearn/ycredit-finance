@@ -369,7 +369,6 @@ class Store {
     try {
       const { asset, amount } = payload.content
       const account = store.getStore('account')
-      const assets = store.getStore('assets')
       const web3 = await this._getWeb3Provider();
 
       const assetAddress = asset.erc20address
@@ -398,7 +397,6 @@ class Store {
     try {
       const { asset, amount } = payload.content
       const account = store.getStore('account')
-      const assets = store.getStore('assets')
       const scDecimals = store.getStore('scAsset').decimals
       const web3 = await this._getWeb3Provider();
 
@@ -427,7 +425,6 @@ class Store {
     try {
       const { asset, amount } = payload.content
       const account = store.getStore('account')
-      const assets = store.getStore('assets')
       const web3 = await this._getWeb3Provider();
 
       this._checkApproval(asset, account, amount, config.stableCreditProtocolAddress, (err) => {
@@ -484,7 +481,6 @@ class Store {
     try {
       const { asset, amount } = payload.content
       const account = store.getStore('account')
-      const assets = store.getStore('assets')
       const scDecimals = store.getStore('scAsset').decimals
       const web3 = await this._getWeb3Provider();
 
@@ -535,7 +531,6 @@ class Store {
     try {
       const { asset, amount } = payload.content
       const account = store.getStore('account')
-      const assets = store.getStore('assets')
       const scDecimals = store.getStore('scAsset').decimals
       const web3 = await this._getWeb3Provider();
 
@@ -565,7 +560,6 @@ class Store {
     try {
       const { asset, amount } = payload.content
       const account = store.getStore('account')
-      const assets = store.getStore('assets')
       const scDecimals = store.getStore('scAsset').decimals
       const web3 = await this._getWeb3Provider();
 
@@ -594,8 +588,6 @@ class Store {
     try {
       const { asset, amount } = payload.content
       const account = store.getStore('account')
-      const assets = store.getStore('assets')
-      const scDecimals = store.getStore('scAsset').decimals
       const web3 = await this._getWeb3Provider();
 
       const assetAddress = asset.erc20address
@@ -650,7 +642,6 @@ class Store {
     try {
       const { asset, amount } = payload.content
       const account = store.getStore('account')
-      const assets = store.getStore('assets')
       const web3 = await this._getWeb3Provider();
 
       const assetAddress = asset.erc20address

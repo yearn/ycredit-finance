@@ -342,7 +342,6 @@ class Asset extends Component {
       asset
     } = this.props
     const {
-      loading,
       calculatedDepositAmount
     } = this.state
 
@@ -371,7 +370,6 @@ class Asset extends Component {
       asset
     } = this.props
     const {
-      loading,
       calculatedWithdrawAmount
     } = this.state
 
