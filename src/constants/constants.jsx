@@ -1,3 +1,6 @@
+import BigNumber from 'bignumber.js'
+
+
 export const ERROR = 'ERROR'
 
 
@@ -16,6 +19,7 @@ export const CONNECTION_DISCONNECTED = 'CONNECTION_DISCONNECTED'
 export const GET_BALANCES = 'GET_BALANCES'
 export const BALANCES_RETURNED = 'BALANCES_RETURNED'
 
+
 // #Liquidity
 export const GET_DEPOSIT_AMOUNT = 'GET_DEPOSIT_AMOUNT'
 export const DEPOSIT_AMOUNT_RETURNED = 'DEPOSIT_AMOUNT_RETURNED'
@@ -28,6 +32,18 @@ export const DEPOSIT_RETURNED = 'DEPOSIT_RETURNED'
 
 export const WITHDRAW = 'WITHDRAW'
 export const WITHDRAW_RETURNED = 'WITHDRAW_RETURNED'
+
+export const DEPOSIT_ALL = 'DEPOSIT_ALL'
+export const DEPOSIT_ALL_RETURNED = 'DEPOSIT_ALL_RETURNED'
+
+export const WITHDRAW_ALL = 'WITHDRAW_ALL'
+export const WITHDRAW_ALL_RETURNED = 'WITHDRAW_ALL_RETURNED'
+
+export const STAKE = 'STAKE'
+export const STAKE_RETURNED = 'STAKE_RETURNED'
+
+export const UNSTAKE = 'UNSTAKE'
+export const UNSTAKE_RETURNED = 'UNSTAKE_RETURNED'
 
 
 // #lending
@@ -45,3 +61,11 @@ export const REPAY_RETURNED = 'REPAY_RETURNED'
 
 export const CLAIM = 'CLAIM'
 export const CLAIM_RETURNED = 'CLAIM_RETURNED'
+
+
+
+// #GENERAL
+export const MAX_UINT256 = new BigNumber(2)
+  .pow(256)
+  .minus(1)
+  .toFixed(0);

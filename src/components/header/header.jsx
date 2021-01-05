@@ -172,7 +172,7 @@ class Header extends Component {
               height={ '40px' }
               onClick={ () => { this.nav('') } }
             />
-            <Typography variant={ 'h3'} className={ classes.name } onClick={ () => { this.nav('') } }>ycredit.finance</Typography>
+            <Typography variant={ 'h3'} className={ classes.name } onClick={ () => { this.nav('') } }>Stable Credit</Typography>
           </div>
           <div className={ classes.links }>
             { this.renderLink('collateral') }

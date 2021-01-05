@@ -6,6 +6,7 @@ import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
+  Button
 } from '@material-ui/core';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import { colors } from '../../theme'
@@ -21,6 +22,12 @@ import {
   CONNECTION_DISCONNECTED,
   DEPOSIT_RETURNED,
   WITHDRAW_RETURNED,
+
+  STAKE,
+  STAKE_RETURNED,
+  UNSTAKE,
+  UNSTAKE_RETURNED,
+  CLAIM,
   CLAIM_RETURNED
 } from '../../constants'
 
@@ -103,18 +110,6 @@ const styles = theme => ({
   introText: {
     paddingLeft: '20px'
   },
-  actionButton: {
-    '&:hover': {
-      backgroundColor: "#2F80ED",
-    },
-    padding: '12px',
-    backgroundColor: "#2F80ED",
-    border: '1px solid #E1E1E1',
-    fontWeight: 500,
-    [theme.breakpoints.up('md')]: {
-      padding: '15px',
-    }
-  },
   heading: {
     display: 'none',
     flex: 1,
@@ -137,10 +132,6 @@ const styles = theme => ({
     [theme.breakpoints.up('sm')]: {
       display: 'block'
     }
-  },
-  buttonText: {
-    fontWeight: '700',
-    color: 'white',
   },
   assetSummary: {
     display: 'flex',
@@ -268,15 +259,27 @@ const styles = theme => ({
     marginTop: '40px'
   },
   titleBalance: {
-    padding: '20px 10px',
     borderRadius: '50px',
     border: '1px solid '+colors.borderBlue,
     background: colors.white,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     flex: 1,
+  },
+  titleBalanceClaim: {
+    borderRadius: '50px',
+    border: '1px solid '+colors.borderBlue,
+    background: colors.lightBlue,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flex: 1,
+  },
+  whiteText: {
+    color: colors.white
   },
   inline: {
     display: 'flex',
@@ -288,6 +291,20 @@ const styles = theme => ({
   gray: {
     color: colors.darkGray
   },
+  stakeButton: {
+    background: colors.blue,
+    width: '100%',
+    borderRadius: '0px 0px 50px 50px',
+    height: '50px',
+    '&:hover': {
+      background: colors.borderBlue
+    }
+  },
+  titleBalanceValues: {
+    justifyContent: 'center',
+    padding: '20px 10px',
+    flex: 1
+  }
 });
 
 class Collateral extends Component {
@@ -315,6 +332,8 @@ class Collateral extends Component {
     emitter.on(DEPOSIT_RETURNED, this.depositReturned);
     emitter.on(WITHDRAW_RETURNED, this.withdrawReturned);
     emitter.on(CLAIM_RETURNED, this.claimReturned);
+    emitter.on(STAKE_RETURNED, this.stakeReturned);
+    emitter.on(UNSTAKE_RETURNED, this.unstakeReturned);
   }
 
   componentWillUnmount() {
@@ -325,6 +344,8 @@ class Collateral extends Component {
     emitter.removeListener(DEPOSIT_RETURNED, this.depositReturned);
     emitter.removeListener(WITHDRAW_RETURNED, this.withdrawReturned);
     emitter.removeListener(CLAIM_RETURNED, this.claimReturned);
+    emitter.removeListener(STAKE_RETURNED, this.stakeReturned);
+    emitter.removeListener(UNSTAKE_RETURNED, this.unstakeReturned);
   };
 
   depositReturned = () => {
@@ -336,6 +357,14 @@ class Collateral extends Component {
   };
 
   claimReturned = (txHash) => {
+    this.setState({ loading: false })
+  };
+
+  stakeReturned = (txHash) => {
+    this.setState({ loading: false })
+  };
+
+  unstakeReturned = (txHash) => {
     this.setState({ loading: false })
   };
 
@@ -377,14 +406,50 @@ class Collateral extends Component {
       <div className={ classes.root }>
         <div className={ classes.portfolioContainer }>
           <div className={ classes.titleBalance }>
-            <Typography variant={ 'h2' } noWrap>$ { scAsset.depositedBalance.toFixed(2) }</Typography>
-            <Typography variant={ 'h4' } className={ classes.gray }>Collateral</Typography>
+            <div className={ classes.titleBalanceValues }>
+              <Typography variant={ 'h2' } noWrap>${ scAsset.balance.toFixed(2) }</Typography>
+              <Typography variant={ 'h4' } className={ classes.gray }>Credit Available</Typography>
+            </div>
+            <Button
+              color="primary"
+              disabled={ loading || scAsset.balance <= 0 }
+              onClick={ this.onStake }
+              className={ classes.stakeButton }
+              >
+              <Typography variant={ 'h5'} className={ classes.whiteText }>Stake</Typography>
+            </Button>
           </div>
           <div className={ classes.between }>
           </div>
           <div className={ classes.titleBalance }>
-            <Typography variant={ 'h2' } noWrap>$ { scAsset.balance.toFixed(2) }</Typography>
-            <Typography variant={ 'h4' } className={ classes.gray }>Credit available</Typography>
+            <div className={ classes.titleBalanceValues }>
+              <Typography variant={ 'h2' } noWrap>${ scAsset.stakedBalance.toFixed(2) }</Typography>
+              <Typography variant={ 'h4' } className={ classes.gray }>Credit Staked</Typography>
+            </div>
+            <Button
+              color="primary"
+              disabled={ loading || scAsset.stakedBalance <= 0 }
+              onClick={ this.onUnstake }
+              className={ classes.stakeButton }
+              >
+              <Typography variant={ 'h5'} className={ classes.whiteText }>Unstake</Typography>
+            </Button>
+          </div>
+          <div className={ classes.between }>
+          </div>
+          <div className={ classes.titleBalance }>
+            <div className={ classes.titleBalanceValues }>
+              <Typography variant={ 'h2' } noWrap>${ scAsset.claimableBalance.toFixed(2) }</Typography>
+              <Typography variant={ 'h4' } className={ classes.gray }>Claimable</Typography>
+            </div>
+            <Button
+              color="primary"
+              disabled={ loading || scAsset.claimableBalance <= 0 }
+              onClick={ this.onClaim }
+              className={ classes.stakeButton }
+              >
+              <Typography variant={ 'h5'} className={ classes.whiteText }>Claim</Typography>
+            </Button>
           </div>
         </div>
         <div className={ classes.investedContainer }>
@@ -402,7 +467,7 @@ class Collateral extends Component {
   };
 
   renderAssetBlocks = () => {
-    const { assets, expanded } = this.state
+    const { assets, expanded, scAsset } = this.state
     const { classes } = this.props
     const width = window.innerWidth
 
@@ -430,8 +495,8 @@ class Collateral extends Component {
                 </div>
               </div>
               <div className={classes.heading}>
-                <Typography variant={ 'h5' } className={ classes.grey }>You have deposited:</Typography>
-                <Typography variant={ 'h3' } noWrap>{ (asset.depositedBalance ? (asset.depositedBalance).toFixed(2) : '0.00') } {asset.symbol}</Typography>
+                <Typography variant={ 'h5' } className={ classes.grey }>Collateral Minted:</Typography>
+                <Typography variant={ 'h3' } noWrap>{ (asset.creditBalance ? (asset.creditBalance).toFixed(2) : '0.00') } {scAsset.symbol}</Typography>
               </div>
               <div className={classes.heading}>
                 <Typography variant={ 'h5' } className={ classes.grey }>Available to deposit:</Typography>
@@ -448,19 +513,26 @@ class Collateral extends Component {
   }
 
   sortAsses = (a, b) => {
-    if (a.balance > b.balance) {
+
+    if(a.creditBalance > b.creditBalance) {
       return -1
-    } else if (a.balance < b.balance) {
+    } else if (a.creditBalance < b.creditBalance) {
       return 1
     } else {
-      if(a.name > b.name) {
-        return 1
-      } else if(a.name < b.name) {
+      if (a.balance > b.balance) {
         return -1
+      } else if (a.balance < b.balance) {
+        return 1
+      } else {
+        if(a.name > b.name) {
+          return 1
+        } else if(a.name < b.name) {
+          return -1
+        }
       }
-
-      return 0
     }
+
+    return 0
   }
 
   getLogoForAsset = (asset) => {
@@ -477,6 +549,30 @@ class Collateral extends Component {
 
   startLoading = () => {
     this.setState({ loading: true })
+  }
+
+  onUnstake = () => {
+    const { scAsset } = this.state
+
+    this.setState({ loading: true })
+
+    dispatcher.dispatch({ type: UNSTAKE, content: { asset: scAsset } })
+  }
+
+  onStake = () => {
+    const { scAsset } = this.state
+
+    this.setState({ loading: true })
+
+    dispatcher.dispatch({ type: STAKE, content: { asset: scAsset } })
+  }
+
+  onClaim = () => {
+    const { scAsset } = this.state
+
+    this.setState({ loading: true })
+
+    dispatcher.dispatch({ type: CLAIM, content: { asset: scAsset } })
   }
 }
 

@@ -1,6 +1,7 @@
 import config from "../config";
 import async from 'async';
 import {
+  MAX_UINT256,
   SNACKBAR_ERROR,
   SNACKBAR_TRANSACTION_RECEIPT,
   SNACKBAR_TRANSACTION_CONFIRMED,
@@ -16,6 +17,10 @@ import {
   DEPOSIT_RETURNED,
   WITHDRAW,
   WITHDRAW_RETURNED,
+  DEPOSIT_ALL,
+  DEPOSIT_ALL_RETURNED,
+  WITHDRAW_ALL,
+  WITHDRAW_ALL_RETURNED,
   GET_BORROW_AMOUNT,
   BORROW_AMOUNT_RETURNED,
   GET_REPAY_AMOUNT,
@@ -26,6 +31,10 @@ import {
   REPAY_RETURNED,
   CLAIM,
   CLAIM_RETURNED,
+  STAKE,
+  STAKE_RETURNED,
+  UNSTAKE,
+  UNSTAKE_RETURNED,
 } from '../constants';
 import Web3 from 'web3';
 
@@ -126,6 +135,26 @@ class Store {
           balance: 0,
           depositedBalance: 0,
           decimals: 18,
+        },
+        {
+          id: 'WETH',
+          name: 'Wrapped Eth',
+          symbol: 'WETH',
+          description: 'Wrapped Eth',
+          erc20address: '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2',
+          balance: 0,
+          depositedBalance: 0,
+          decimals: 18,
+        },
+        {
+          id: 'MKR',
+          name: 'Maker',
+          symbol: 'MKR',
+          description: 'Maker',
+          erc20address: '0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2',
+          balance: 0,
+          depositedBalance: 0,
+          decimals: 18,
         }
         // {
         //   id: 'ETH',
@@ -138,14 +167,14 @@ class Store {
         // }
       ],
       scAsset: {
-        id: 'scUSD',
-        name: 'scUSD',
-        symbol: 'scUSD',
-        description: 'scUSD',
+        id: 'Xii',
+        name: 'Stable Credit',
+        symbol: 'Xii',
+        description: 'Stable Yield Credit',
         erc20address: config.stableCreditProtocolAddress,
         balance: 0,
-        creditBalance: 0,
-        depositedBalance: 0,
+        stakedBalance: 0,
+        claimableBalance: 0,
         decimals: 8
       },
       connectorsByName: {
@@ -184,6 +213,12 @@ class Store {
           case WITHDRAW:
             this.withdraw(payload);
             break
+          case DEPOSIT_ALL:
+            this.depositAll(payload);
+            break
+          case WITHDRAW_ALL:
+            this.withdrawAll(payload);
+            break
           case GET_BORROW_AMOUNT:
             this.getBorrowAmount(payload);
             break
@@ -195,6 +230,12 @@ class Store {
             break
           case REPAY:
             this.repay(payload);
+            break
+          case STAKE:
+            this.stake(payload);
+            break
+          case UNSTAKE:
+            this.unstake(payload);
             break
           case CLAIM:
             this.claim(payload);
@@ -230,10 +271,7 @@ class Store {
         ethAllowance = (allowance*10**asset.decimals).toFixed(0);
       }
 
-      var amountToSend = web3.utils.toWei('999999999', "ether")
-      if (asset.decimals !== 18) {
-        amountToSend = (999999999*10**asset.decimals).toFixed(0);
-      }
+      var amountToSend = MAX_UINT256
 
       if(parseFloat(ethAllowance) < parseFloat(amount)) {
         await erc20Contract.methods.approve(contract, amountToSend).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
@@ -299,16 +337,12 @@ class Store {
           async.map(assets, (asset, callback) => {
             async.parallel([
               (callbackInner) => { this._getERC20Balance(web3, asset, account, callbackInner) },
-              (callbackInner) => { this._getscUSDBalance(web3, asset, account, callbackInner) },
-              // (callbackInner) => { this._getDepositedBalance(web3, asset, account, callbackInner) },
-              // (callbackInner) => { this._getCredit(web3, asset, account, callbackInner) },
+              (callbackInner) => { this._getCreditBalance(web3, asset, account, callbackInner) },
+              (callbackInner) => { this._getDepositedBalance(web3, asset, account, callbackInner) },
             ], (err, data) => {
               asset.balance = data[0]
-              asset.depositedBalance = 0
-              asset.creditBalance = 0
-              asset.scUSDBalance = data[1]
-              // asset.depositedBalance = data[2] > 999999999999 ? 0 : data[2]
-              // asset.creditBalance = data[3]
+              asset.creditBalance = data[1]
+              asset.depositedBalance = data[2]
 
               callback(null, asset)
             })
@@ -321,12 +355,18 @@ class Store {
           })
         },
         (cb) => {
-          this._getERC20Balance(web3, scAsset, account, (err, balance) => {
+          async.parallel([
+            (callbackInner) => { this._getERC20Balance(web3, scAsset, account, callbackInner) },
+            (callbackInner) => { this._getStakedBalance(web3, scAsset, account, callbackInner) },
+            (callbackInner) => { this._getClaimableBalance(web3, scAsset, account, callbackInner) },
+          ], (err, data) => {
             if(err) {
               return cb(err)
             }
 
-            scAsset.balance = balance
+            scAsset.balance = data[0]
+            scAsset.stakedBalance = data[1]
+            scAsset.claimableBalance = data[2]
 
             cb(null, scAsset)
           })
@@ -341,6 +381,8 @@ class Store {
           return accumulator + (asset.creditBalance ? asset.creditBalance : 0)
         }, 0)
         datas[1].creditBalance = credit
+
+        console.log(datas[0])
 
         const deposited = datas[0].reduce((accumulator, asset) => {
           return accumulator + (asset.depositedBalance ? asset.depositedBalance : 0)
@@ -389,6 +431,19 @@ class Store {
 
         } catch(ex) {
           console.log(ex)
+
+          console.log(market)
+
+          return {
+            erc20address: market,
+            id: 'N/A',
+            symbol: 'N/A',
+            name: 'N/A',
+            description: 'N/A',
+            decimals: 18,
+            balance: 0,
+            depositedBalance: 0,
+          }
         }
       }
     })
@@ -424,9 +479,9 @@ class Store {
 
   _getDepositedBalance = async (web3, asset, account, callback) => {
     try {
-      const stableCreditHelperContract = new web3.eth.Contract(config.stableCreditHelperABI, config.stableCreditHelperAddress)
+      const stableCreditProtocolContract = new web3.eth.Contract(config.stableCreditProtocolABI, config.stableCreditProtocolAddress)
 
-      var balance = await stableCreditHelperContract.methods.calculateCollateralOf(account.address, asset.erc20address).call({ from: account.address });
+      var balance = await stableCreditProtocolContract.methods.collateralBalanceOf(account.address, asset.erc20address).call({ from: account.address });
       callback(null, parseFloat(balance)/10**asset.decimals)
     } catch(ex) {
       console.log(ex)
@@ -434,24 +489,38 @@ class Store {
     }
   }
 
-  _getscUSDBalance = async (web3, asset, account, callback) => {
+  _getCreditBalance = async (web3, asset, account, callback) => {
     try {
+      const scDecimals = store.getStore('scAsset').decimals
       const stableCreditProtocolContract = new web3.eth.Contract(config.stableCreditProtocolABI, config.stableCreditProtocolAddress)
 
       var balance = await stableCreditProtocolContract.methods.collateralCredit(account.address, asset.erc20address).call({ from: account.address });
-      callback(null, parseFloat(balance)/10**asset.decimals)
+      callback(null, parseFloat(balance)/10**scDecimals)
     } catch(ex) {
       console.log(ex)
       return callback(ex)
     }
   }
 
-  _getCredit = async (web3, asset, account, callback) => {
+  _getStakedBalance = async (web3, asset, account, callback) => {
     try {
       const scDecimals = store.getStore('scAsset').decimals
-      const stableCreditHelperContract = new web3.eth.Contract(config.stableCreditHelperABI, config.stableCreditHelperAddress)
+      const stableCreditProtocolContract = new web3.eth.Contract(config.stableCreditProtocolABI, config.stableCreditProtocolAddress)
 
-      var balance = await stableCreditHelperContract.methods.credit(account.address, asset.erc20address).call({ from: account.address });
+      var balance = await stableCreditProtocolContract.methods.stakes(account.address).call({ from: account.address });
+      callback(null, parseFloat(balance)/10**scDecimals)
+    } catch(ex) {
+      console.log(ex)
+      return callback(ex)
+    }
+  }
+
+  _getClaimableBalance = async (web3, asset, account, callback) => {
+    try {
+      const scDecimals = store.getStore('scAsset').decimals
+      const stableCreditProtocolContract = new web3.eth.Contract(config.stableCreditProtocolABI, config.stableCreditProtocolAddress)
+
+      var balance = await stableCreditProtocolContract.methods.earned(account.address).call({ from: account.address });
       callback(null, parseFloat(balance)/10**scDecimals)
     } catch(ex) {
       console.log(ex)
@@ -548,20 +617,17 @@ class Store {
   _deposit = async (web3, account, assetAddress, amountToSend, callback) => {
     const stableCreditProtocolContract = new web3.eth.Contract(config.stableCreditProtocolABI, config.stableCreditProtocolAddress)
 
-    stableCreditProtocolContract.methods.deposit(assetAddress, amountToSend).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
+    stableCreditProtocolContract.methods.deposit(assetAddress, amountToSend, 0, 0).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
     .on('transactionHash', function(hash){
       emitter.emit(SNACKBAR_TRANSACTION_HASH, hash)
       callback(null, hash)
     })
     .on('confirmation', function(confirmationNumber, receipt){
-      if(confirmationNumber === 2) {
-        emitter.emit(SNACKBAR_TRANSACTION_CONFIRMED, receipt.transactionHash)
-
+      if(confirmationNumber === 1) {
         dispatcher.dispatch({ type: GET_BALANCES, content: {} })
       }
     })
     .on('receipt', function(receipt){
-      emitter.emit(SNACKBAR_TRANSACTION_RECEIPT, receipt.transactionHash)
     })
     .on('error', function(error) {
       if(error.message) {
@@ -598,20 +664,120 @@ class Store {
   _withdraw = async (web3, account, assetAddress, amountToSend, callback) => {
     const stableCreditProtocolContract = new web3.eth.Contract(config.stableCreditProtocolABI, config.stableCreditProtocolAddress)
 
-    stableCreditProtocolContract.methods.withdraw(assetAddress, amountToSend).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
+    stableCreditProtocolContract.methods.withdraw(assetAddress, amountToSend, MAX_UINT256).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
     .on('transactionHash', function(hash){
       emitter.emit(SNACKBAR_TRANSACTION_HASH, hash)
       callback(null, hash)
     })
     .on('confirmation', function(confirmationNumber, receipt){
-      if(confirmationNumber === 2) {
+      if(confirmationNumber === 1) {
         emitter.emit(SNACKBAR_TRANSACTION_CONFIRMED, receipt.transactionHash)
 
         dispatcher.dispatch({ type: GET_BALANCES, content: {} })
       }
     })
     .on('receipt', function(receipt){
-      emitter.emit(SNACKBAR_TRANSACTION_RECEIPT, receipt.transactionHash)
+    })
+    .on('error', function(error) {
+      if(error.message) {
+        return callback(error.message)
+      }
+      callback(error)
+    })
+  }
+
+  depositAll = async (payload) => {
+    try {
+      const { asset } = payload.content
+      const account = store.getStore('account')
+      const web3 = await this._getWeb3Provider();
+
+      const amount = MAX_UINT256
+
+      this._checkApproval(asset, account, amount, config.stableCreditProtocolAddress, (err) => {
+        if(err) {
+          emitter.emit(ERROR, err);
+          return emitter.emit(SNACKBAR_ERROR, err)
+        }
+
+        this._depositAll(web3, account, asset.erc20address, (err, a) => {
+          if(err) {
+            emitter.emit(ERROR, err)
+            return emitter.emit(SNACKBAR_ERROR, err)
+          }
+
+          emitter.emit(DEPOSIT_ALL_RETURNED)
+        })
+      })
+
+    } catch (ex) {
+      emitter.emit(ERROR, ex)
+      emitter.emit(SNACKBAR_ERROR, ex)
+    }
+  }
+
+  _depositAll = async (web3, account, assetAddress, callback) => {
+    const stableCreditProtocolContract = new web3.eth.Contract(config.stableCreditProtocolABI, config.stableCreditProtocolAddress)
+
+    stableCreditProtocolContract.methods.depositAll(assetAddress, 0, 0).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
+    .on('transactionHash', function(hash){
+      emitter.emit(SNACKBAR_TRANSACTION_HASH, hash)
+      callback(null, hash)
+    })
+    .on('confirmation', function(confirmationNumber, receipt){
+      if(confirmationNumber === 1) {
+        emitter.emit(SNACKBAR_TRANSACTION_CONFIRMED, receipt.transactionHash)
+
+        dispatcher.dispatch({ type: GET_BALANCES, content: {} })
+      }
+    })
+    .on('receipt', function(receipt){
+    })
+    .on('error', function(error) {
+      if(error.message) {
+        return callback(error.message)
+      }
+      callback(error)
+    })
+  }
+
+  withdrawAll = async (payload) => {
+    try {
+      const { asset } = payload.content
+      const account = store.getStore('account')
+      const web3 = await this._getWeb3Provider();
+
+      this._withdrawAll(web3, account, asset.erc20address, (err, a) => {
+        if(err) {
+          emitter.emit(ERROR, err)
+          return emitter.emit(SNACKBAR_ERROR, err)
+        }
+
+        emitter.emit(WITHDRAW_ALL_RETURNED)
+      })
+
+    } catch (ex) {
+      emitter.emit(ERROR, ex)
+      emitter.emit(SNACKBAR_ERROR, ex)
+    }
+  }
+
+  _withdrawAll = async (web3, account, assetAddress, callback) => {
+    const stableCreditProtocolContract = new web3.eth.Contract(config.stableCreditProtocolABI, config.stableCreditProtocolAddress)
+
+    stableCreditProtocolContract.methods.withdrawAll(assetAddress, MAX_UINT256).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
+    .on('transactionHash', function(hash){
+      emitter.emit(SNACKBAR_TRANSACTION_HASH, hash)
+      callback(null, hash)
+    })
+    .on('confirmation', function(confirmationNumber, receipt){
+      if(confirmationNumber === 1) {
+        emitter.emit(SNACKBAR_TRANSACTION_CONFIRMED, receipt.transactionHash)
+
+        dispatcher.dispatch({ type: GET_BALANCES, content: {} })
+      }
+    })
+    .on('receipt', function(receipt){
     })
     .on('error', function(error) {
       if(error.message) {
@@ -715,14 +881,13 @@ class Store {
       callback(null, hash)
     })
     .on('confirmation', function(confirmationNumber, receipt){
-      if(confirmationNumber === 2) {
+      if(confirmationNumber === 1) {
         emitter.emit(SNACKBAR_TRANSACTION_CONFIRMED, receipt.transactionHash)
 
         dispatcher.dispatch({ type: GET_BALANCES, content: {} })
       }
     })
     .on('receipt', function(receipt){
-      emitter.emit(SNACKBAR_TRANSACTION_RECEIPT, receipt.transactionHash)
     })
     .on('error', function(error) {
       if(error.message) {
@@ -770,25 +935,19 @@ class Store {
   _repay = async (web3, account, assetAddress, amountToSend, amountToReceive, callback) => {
     const stableCreditProtocolContract = new web3.eth.Contract(config.stableCreditProtocolABI, config.stableCreditProtocolAddress)
 
-    console.log(assetAddress)
-    console.log(amountToSend)
-    console.log(amountToReceive)
-
-
     stableCreditProtocolContract.methods.repayExactIn(assetAddress, amountToSend, amountToReceive).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
     .on('transactionHash', function(hash){
       emitter.emit(SNACKBAR_TRANSACTION_HASH, hash)
       callback(null, hash)
     })
     .on('confirmation', function(confirmationNumber, receipt){
-      if(confirmationNumber === 2) {
+      if(confirmationNumber === 1) {
         emitter.emit(SNACKBAR_TRANSACTION_CONFIRMED, receipt.transactionHash)
 
         dispatcher.dispatch({ type: GET_BALANCES, content: {} })
       }
     })
     .on('receipt', function(receipt){
-      emitter.emit(SNACKBAR_TRANSACTION_RECEIPT, receipt.transactionHash)
     })
     .on('error', function(error) {
       if(error.message) {
@@ -801,7 +960,6 @@ class Store {
   claim = async (payload) => {
     try {
       const account = store.getStore('account')
-      const scDecimals = store.getStore('scAsset').decimals
       const web3 = await this._getWeb3Provider();
 
       this._claim(web3, account, (err, a) => {
@@ -822,20 +980,122 @@ class Store {
   _claim = async (web3, account, callback) => {
     const stableCreditProtocolContract = new web3.eth.Contract(config.stableCreditProtocolABI, config.stableCreditProtocolAddress)
 
-    stableCreditProtocolContract.methods.claim().send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
+    stableCreditProtocolContract.methods.getReward().send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
     .on('transactionHash', function(hash){
       emitter.emit(SNACKBAR_TRANSACTION_HASH, hash)
       callback(null, hash)
     })
     .on('confirmation', function(confirmationNumber, receipt){
-      if(confirmationNumber === 2) {
+      if(confirmationNumber === 1) {
         emitter.emit(SNACKBAR_TRANSACTION_CONFIRMED, receipt.transactionHash)
 
         dispatcher.dispatch({ type: GET_BALANCES, content: {} })
       }
     })
     .on('receipt', function(receipt){
-      emitter.emit(SNACKBAR_TRANSACTION_RECEIPT, receipt.transactionHash)
+    })
+    .on('error', function(error) {
+      if(error.message) {
+        return callback(error.message)
+      }
+      callback(error)
+    })
+  }
+
+  stake = async (payload) => {
+    try {
+      const { asset } = payload.content
+      const account = store.getStore('account')
+      const web3 = await this._getWeb3Provider();
+
+      this._checkApproval(asset, account, asset.balance, config.stableCreditProtocolAddress, (err) => {
+        if(err) {
+          emitter.emit(ERROR, err);
+          return emitter.emit(SNACKBAR_ERROR, err)
+        }
+
+        const amountToSend = (asset.balance*10**asset.decimals).toFixed(0)
+
+        this._stake(web3, account, amountToSend, (err, a) => {
+          if(err) {
+            emitter.emit(ERROR, err)
+            return emitter.emit(SNACKBAR_ERROR, err)
+          }
+
+          emitter.emit(STAKE_RETURNED)
+        })
+      })
+
+    } catch (ex) {
+      emitter.emit(ERROR, ex)
+      emitter.emit(SNACKBAR_ERROR, ex)
+    }
+  }
+
+  _stake = async (web3, account, amountToSend, callback) => {
+    const stableCreditProtocolContract = new web3.eth.Contract(config.stableCreditProtocolABI, config.stableCreditProtocolAddress)
+
+    stableCreditProtocolContract.methods.stake(amountToSend).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
+    .on('transactionHash', function(hash){
+      emitter.emit(SNACKBAR_TRANSACTION_HASH, hash)
+      callback(null, hash)
+    })
+    .on('confirmation', function(confirmationNumber, receipt){
+      if(confirmationNumber === 1) {
+        emitter.emit(SNACKBAR_TRANSACTION_CONFIRMED, receipt.transactionHash)
+
+        dispatcher.dispatch({ type: GET_BALANCES, content: {} })
+      }
+    })
+    .on('receipt', function(receipt){
+    })
+    .on('error', function(error) {
+      if(error.message) {
+        return callback(error.message)
+      }
+      callback(error)
+    })
+  }
+
+  unstake = async (payload) => {
+    try {
+      const { asset } = payload.content
+      const account = store.getStore('account')
+      const web3 = await this._getWeb3Provider();
+
+      const amountToSend = (asset.stakedBalance*10**asset.decimals).toFixed(0)
+
+      this._unstake(web3, account, amountToSend, (err, a) => {
+        if(err) {
+          emitter.emit(ERROR, err)
+          return emitter.emit(SNACKBAR_ERROR, err)
+        }
+
+        emitter.emit(UNSTAKE_RETURNED)
+      })
+
+    } catch (ex) {
+      emitter.emit(ERROR, ex)
+      emitter.emit(SNACKBAR_ERROR, ex)
+    }
+  }
+
+  _unstake = async (web3, account, amountToSend, callback) => {
+    const stableCreditProtocolContract = new web3.eth.Contract(config.stableCreditProtocolABI, config.stableCreditProtocolAddress)
+
+    stableCreditProtocolContract.methods.unstake(amountToSend).send({ from: account.address, gasPrice: web3.utils.toWei(await this._getGasPrice(), 'gwei') })
+    .on('transactionHash', function(hash){
+      emitter.emit(SNACKBAR_TRANSACTION_HASH, hash)
+      callback(null, hash)
+    })
+    .on('confirmation', function(confirmationNumber, receipt){
+      if(confirmationNumber === 1) {
+        emitter.emit(SNACKBAR_TRANSACTION_CONFIRMED, receipt.transactionHash)
+
+        dispatcher.dispatch({ type: GET_BALANCES, content: {} })
+      }
+    })
+    .on('receipt', function(receipt){
     })
     .on('error', function(error) {
       if(error.message) {
