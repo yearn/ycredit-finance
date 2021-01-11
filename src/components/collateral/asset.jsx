@@ -150,6 +150,7 @@ class Asset extends Component {
       redeemAmount: '',
       redeemAmountError: false,
       account: store.getStore('account'),
+      scAsset: store.getStore('scAsset'),
       calculatedDepositAmount: null,
       calculatedWithdrawAmount: null
     }
@@ -200,6 +201,7 @@ class Asset extends Component {
   render() {
     const { classes, asset } = this.props;
     const {
+      scAsset,
       amount,
       amountError,
       redeemAmount,
@@ -210,7 +212,7 @@ class Asset extends Component {
     return (<div className={ classes.actionsContainer }>
       <div className={ classes.tradeContainer }>
         <div className={ classes.balances }>
-            <Typography variant='h4' onClick={ () => { this.setAmount(100) } } className={ classes.value } noWrap>{ 'Balance: '+ (asset.balance ? (Math.floor(asset.balance*10000)/10000).toFixed(4) : '0.0000') } { asset.tokenSymbol ? asset.tokenSymbol : asset.symbol }</Typography>
+          <Typography variant='h4' onClick={ () => { this.setAmount(100) } } className={ classes.value } noWrap>{ 'Balance: '+ (asset.balance ? (Math.floor(asset.balance*10000)/10000).toFixed(4) : '0.0000') } { asset.tokenSymbol ? asset.tokenSymbol : asset.symbol }</Typography>
         </div>
         <TextField
           fullWidth
@@ -284,7 +286,7 @@ class Asset extends Component {
       <div className={ classes.sepperator }></div>
       <div className={classes.tradeContainer}>
         <div className={ classes.balances }>
-          <Typography variant='h4' onClick={ () => { this.setRedeemAmount(100) } }  className={ classes.value } noWrap>Balance: { (asset.creditBalance ? (Math.floor(asset.creditBalance*10000)/10000).toFixed(4) : '0.0000') } Xii </Typography>
+          <Typography variant='h4' onClick={ () => { this.setRedeemAmount(100) } }  className={ classes.value } noWrap>Balance: { (asset.creditBalance ? (Math.floor(asset.creditBalance*10000)/10000).toFixed(4) : '0.0000') } {scAsset.symbol} </Typography>
         </div>
         <TextField
           fullWidth
@@ -365,7 +367,8 @@ class Asset extends Component {
       asset
     } = this.props
     const {
-      calculatedDepositAmount
+      calculatedDepositAmount,
+      scAsset
     } = this.state
 
     if(!calculatedDepositAmount) {
@@ -375,11 +378,11 @@ class Asset extends Component {
     return (
       <div className={ classes.priceContainer }>
         <div className={ classes.priceConversion }>
-          <Typography variant='h4' className={ classes.conversionDirection }>{ `Xii per ${asset.symbol}` }</Typography>
+          <Typography variant='h4' className={ classes.conversionDirection }>{ `${scAsset.symbol} per ${asset.symbol}` }</Typography>
           <Typography variant='h3' >{ calculatedDepositAmount ? calculatedDepositAmount.receivePerSend.toFixed(4) : '-' }</Typography>
         </div>
         <div className={ classes.priceConversion }>
-          <Typography variant='h4' className={ classes.conversionDirection }>You will receive Xii</Typography>
+          <Typography variant='h4' className={ classes.conversionDirection }>You will receive {scAsset.symbol}</Typography>
           <Typography variant='h3' >{ calculatedDepositAmount ? calculatedDepositAmount.returnPrice.toFixed(4) : '-' }</Typography>
         </div>
       </div>
@@ -413,6 +416,7 @@ class Asset extends Component {
       </div>
     )
   }
+
 
   onChange = (event) => {
     let val = []

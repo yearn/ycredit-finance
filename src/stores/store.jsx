@@ -3,16 +3,12 @@ import async from 'async';
 import {
   MAX_UINT256,
   SNACKBAR_ERROR,
-  SNACKBAR_TRANSACTION_RECEIPT,
+  // SNACKBAR_TRANSACTION_RECEIPT,
   SNACKBAR_TRANSACTION_CONFIRMED,
   SNACKBAR_TRANSACTION_HASH,
   ERROR,
   GET_BALANCES,
   BALANCES_RETURNED,
-  GET_DEPOSIT_AMOUNT,
-  DEPOSIT_AMOUNT_RETURNED,
-  GET_WITHDRAW_AMOUNT,
-  WITHDRAW_AMOUNT_RETURNED,
   DEPOSIT,
   DEPOSIT_RETURNED,
   WITHDRAW,
@@ -35,6 +31,10 @@ import {
   STAKE_RETURNED,
   UNSTAKE,
   UNSTAKE_RETURNED,
+  GET_MARKET_INFO,
+  MARKET_INFO_RETURNED,
+  ADD_MARKET,
+  ADD_MARKET_RETURNED
 } from '../constants';
 import Web3 from 'web3';
 
@@ -156,20 +156,11 @@ class Store {
           depositedBalance: 0,
           decimals: 18,
         }
-        // {
-        //   id: 'ETH',
-        //   name: 'ETH',
-        //   symbol: 'ETH',
-        //   description: 'Ethereum',
-        //   erc20address: 'Ethereum',
-        //   balance: 0,
-        //   decimals: 18,
-        // }
       ],
       scAsset: {
-        id: 'Xii',
+        id: 'xiii',
         name: 'Stable Credit',
-        symbol: 'Xii',
+        symbol: 'xiii',
         description: 'Stable Yield Credit',
         erc20address: config.stableCreditProtocolAddress,
         balance: 0,
@@ -200,12 +191,6 @@ class Store {
         switch (payload.type) {
           case GET_BALANCES:
             this.getBalances(payload);
-            break
-          case GET_DEPOSIT_AMOUNT:
-            this.getDepositAmount(payload);
-            break
-          case GET_WITHDRAW_AMOUNT:
-            this.getWithdrawAmount(payload);
             break
           case DEPOSIT:
             this.deposit(payload);
@@ -239,6 +224,12 @@ class Store {
             break
           case CLAIM:
             this.claim(payload);
+            break
+          case GET_MARKET_INFO:
+            this.getMarketInfo(payload);
+            break
+          case ADD_MARKET:
+            this.addMarket(payload)
             break
           default: {
           }
@@ -337,12 +328,20 @@ class Store {
           async.map(assets, (asset, callback) => {
             async.parallel([
               (callbackInner) => { this._getERC20Balance(web3, asset, account, callbackInner) },
-              (callbackInner) => { this._getCreditBalance(web3, asset, account, callbackInner) },
+              (callbackInner) => { this._getCreditBalances(web3, asset, account, callbackInner) },
               (callbackInner) => { this._getDepositedBalance(web3, asset, account, callbackInner) },
+              (callbackInner) => { this._getPrice(web3, asset, callbackInner) }
             ], (err, data) => {
+              if(err) {
+                return callback(err)
+              }
+
               asset.balance = data[0]
-              asset.creditBalance = data[1]
+              asset.creditBalance = data[1].balance
+              asset.profit = data[1].profit
+              asset.shortFall = data[1].shortFall
               asset.depositedBalance = data[2]
+              asset.price = data[3]
 
               callback(null, asset)
             })
@@ -381,8 +380,6 @@ class Store {
           return accumulator + (asset.creditBalance ? asset.creditBalance : 0)
         }, 0)
         datas[1].creditBalance = credit
-
-        console.log(datas[0])
 
         const deposited = datas[0].reduce((accumulator, asset) => {
           return accumulator + (asset.depositedBalance ? asset.depositedBalance : 0)
@@ -489,13 +486,32 @@ class Store {
     }
   }
 
-  _getCreditBalance = async (web3, asset, account, callback) => {
+  _getPrice = async (web3, asset, callback) => {
     try {
       const scDecimals = store.getStore('scAsset').decimals
       const stableCreditProtocolContract = new web3.eth.Contract(config.stableCreditProtocolABI, config.stableCreditProtocolAddress)
 
-      var balance = await stableCreditProtocolContract.methods.collateralCredit(account.address, asset.erc20address).call({ from: account.address });
-      callback(null, parseFloat(balance)/10**scDecimals)
+      var price = await stableCreditProtocolContract.methods.getPriceOracle(asset.erc20address).call();
+      callback(null, parseFloat(price)/10**scDecimals)
+    } catch(ex) {
+      console.log(ex)
+      return callback(ex)
+    }
+  }
+
+  _getCreditBalances = async (web3, asset, account, callback) => {
+    try {
+      const scDecimals = store.getStore('scAsset').decimals
+      const stableCreditProtocolContract = new web3.eth.Contract(config.stableCreditProtocolABI, config.stableCreditProtocolAddress)
+
+      const balance = await stableCreditProtocolContract.methods.collateralCredit(account.address, asset.erc20address).call({ from: account.address });
+      const shortFall = await stableCreditProtocolContract.methods.shortFall(asset.erc20address, account.address, balance).call({ from: account.address });
+      const profit = await stableCreditProtocolContract.methods.profit(asset.erc20address, account.address, balance).call({ from: account.address });
+      callback(null, {
+        balance: parseFloat(balance)/10**scDecimals,
+        profit: parseFloat(profit)/10**scDecimals,
+        shortFall: parseFloat(shortFall)/10**scDecimals,
+      })
     } catch(ex) {
       console.log(ex)
       return callback(ex)
@@ -525,62 +541,6 @@ class Store {
     } catch(ex) {
       console.log(ex)
       return callback(ex)
-    }
-  }
-
-  getDepositAmount = async (payload) => {
-    try {
-      const { asset, amount } = payload.content
-      const account = store.getStore('account')
-      const web3 = await this._getWeb3Provider();
-
-      const assetAddress = asset.erc20address
-      const amountToSend = (amount*10**asset.decimals).toFixed(0)
-      const stableCreditHelperContract = new web3.eth.Contract(config.stableCreditHelperABI, config.stableCreditHelperAddress)
-
-      const price = await stableCreditHelperContract.methods.calculateCredit(assetAddress, amountToSend).call({ from: account.address })
-
-      const returnObj = {
-        sendAmount: amount,
-        price: price,
-        returnPrice: price/10**asset.decimals,
-        receivePerSend: price/amountToSend,
-        sendPerReceive: amountToSend/price,
-      }
-
-      emitter.emit(DEPOSIT_AMOUNT_RETURNED, returnObj)
-    } catch(ex) {
-      console.log(ex)
-      emitter.emit(ERROR, ex)
-      emitter.emit(SNACKBAR_ERROR, ex)
-    }
-  }
-
-  getWithdrawAmount = async (payload) => {
-    try {
-      const { asset, amount } = payload.content
-      const account = store.getStore('account')
-      const scDecimals = store.getStore('scAsset').decimals
-      const web3 = await this._getWeb3Provider();
-
-      const assetAddress = asset.erc20address
-      const amountToSend = (amount*10**scDecimals).toFixed(0)
-      const stableCreditHelperContract = new web3.eth.Contract(config.stableCreditHelperABI, config.stableCreditHelperAddress)
-
-      const price = await stableCreditHelperContract.methods.calculateWithdraw(assetAddress, amountToSend).call({ from: account.address })
-
-      const returnObj = {
-        sendAmount: amount,
-        price: price,
-        returnPrice: price/10**asset.decimals,
-        receivePerSend: (price*10**scDecimals)/(amountToSend*10**asset.decimals),
-        sendPerReceive: (amountToSend*10**asset.decimals)/(price*10**scDecimals),
-      }
-
-      emitter.emit(WITHDRAW_AMOUNT_RETURNED, returnObj)
-    } catch(ex) {
-      emitter.emit(ERROR, ex)
-      emitter.emit(SNACKBAR_ERROR, ex)
     }
   }
 
@@ -1103,6 +1063,69 @@ class Store {
       }
       callback(error)
     })
+  }
+
+  getMarketInfo = async (payload) => {
+    const account = store.getStore('account')
+    const { address } = payload.content
+
+    if(!account || !account.address) {
+      return false
+    }
+
+    const web3 = await this._getWeb3Provider();
+
+    try {
+      const erc20Contract = new web3.eth.Contract(config.erc20ABI, address)
+
+      const balanceOf = await erc20Contract.methods.balanceOf(account.address).call()
+      const decimals = await erc20Contract.methods.decimals().call()
+      const symbol = await erc20Contract.methods.symbol().call()
+
+      const asset = {
+        erc20address: address,
+        id: symbol,
+        symbol: symbol,
+        decimals: decimals,
+        balance: balanceOf/10**decimals
+      }
+
+      emitter.emit(MARKET_INFO_RETURNED, asset)
+
+    } catch(ex) {
+      emitter.emit(ERROR, ex)
+      emitter.emit(SNACKBAR_ERROR, ex)
+    }
+  }
+
+  addMarket = async (payload) => {
+    try {
+      const { asset, amount } = payload.content
+      const account = store.getStore('account')
+      const web3 = await this._getWeb3Provider();
+
+      this._checkApproval(asset, account, amount, config.stableCreditProtocolAddress, (err) => {
+        if(err) {
+          emitter.emit(ERROR, err);
+          return emitter.emit(SNACKBAR_ERROR, err)
+        }
+
+        const amountToSend = (amount*10**asset.decimals).toFixed(0)
+
+        this._deposit(web3, account, asset.erc20address, amountToSend, (err, a) => {
+          if(err) {
+            emitter.emit(ERROR, err)
+            return emitter.emit(SNACKBAR_ERROR, err)
+          }
+
+          emitter.emit(ADD_MARKET_RETURNED)
+        })
+      })
+
+    } catch (ex) {
+      emitter.emit(ERROR, ex)
+      emitter.emit(SNACKBAR_ERROR, ex)
+    }
   }
 
   _getGasPrice = async () => {

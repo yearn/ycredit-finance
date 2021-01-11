@@ -6,10 +6,13 @@ import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
-  Button
+  Button,
+  TextField,
+  InputAdornment
 } from '@material-ui/core';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import { colors } from '../../theme'
+import Web3 from 'web3';
 
 import Asset from './asset'
 import Loader from '../loader'
@@ -28,7 +31,12 @@ import {
   UNSTAKE,
   UNSTAKE_RETURNED,
   CLAIM,
-  CLAIM_RETURNED
+  CLAIM_RETURNED,
+
+  GET_MARKET_INFO,
+  MARKET_INFO_RETURNED,
+  ADD_MARKET,
+  ADD_MARKET_RETURNED,
 } from '../../constants'
 
 import Store from "../../stores";
@@ -304,7 +312,34 @@ const styles = theme => ({
     justifyContent: 'center',
     padding: '20px 10px',
     flex: 1
-  }
+  },
+  addMarketContainer: {
+    width: '100%',
+    display: 'flex',
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end'
+  },
+  addMarketField: {
+    display: 'none'
+  },
+  addMarketFieldExpanded: {
+    display: 'flex',
+    flex: 1,
+    marginRight: '12px',
+    flexDirection: 'column'
+  },
+  addMarketTextField: {
+    background: colors.white
+  },
+  addMarketButton: {
+    height: '47px'
+  },
+  balances: {
+    width: '100%',
+    textAlign: 'right',
+    paddingRight: '20px',
+    cursor: 'pointer'
+  },
 });
 
 class Collateral extends Component {
@@ -318,6 +353,12 @@ class Collateral extends Component {
       assets: store.getStore('assets'),
       scAsset: store.getStore('scAsset'),
       account: account,
+      marketAsset: null,
+      marketAddress: '',
+      marketAddressError: false,
+      marketDeposit: '',
+      marketDepositError: false,
+      addMarketExpanded: false
     }
 
     if(account && account.address) {
@@ -334,6 +375,8 @@ class Collateral extends Component {
     emitter.on(CLAIM_RETURNED, this.claimReturned);
     emitter.on(STAKE_RETURNED, this.stakeReturned);
     emitter.on(UNSTAKE_RETURNED, this.unstakeReturned);
+    emitter.on(MARKET_INFO_RETURNED, this.marketInfoReturned);
+    emitter.on(ADD_MARKET_RETURNED, this.addMarketReturned);
   }
 
   componentWillUnmount() {
@@ -346,7 +389,21 @@ class Collateral extends Component {
     emitter.removeListener(CLAIM_RETURNED, this.claimReturned);
     emitter.removeListener(STAKE_RETURNED, this.stakeReturned);
     emitter.removeListener(UNSTAKE_RETURNED, this.unstakeReturned);
+    emitter.removeListener(MARKET_INFO_RETURNED, this.marketInfoReturned);
+    emitter.removeListener(ADD_MARKET_RETURNED, this.addMarketReturned);
   };
+
+  addMarketReturned = () => {
+    this.setState({ loading: false })
+  }
+
+  marketInfoReturned = (asset) => {
+    console.log(asset)
+    this.setState({
+      loading: false,
+      marketAsset: asset
+    })
+  }
 
   depositReturned = () => {
     this.setState({ loading: false })
@@ -453,6 +510,7 @@ class Collateral extends Component {
           </div>
         </div>
         <div className={ classes.investedContainer }>
+          { this.renderAddMarket() }
           { this.renderAssetBlocks() }
         </div>
         { loading && <Loader /> }
@@ -460,11 +518,73 @@ class Collateral extends Component {
     )
   };
 
-  onChange = (event) => {
-    let val = []
-    val[event.target.id] = event.target.checked
-    this.setState(val)
-  };
+  renderAddMarket = () => {
+    const {
+      marketAddress,
+      marketAddressError,
+      addMarketExpanded,
+      marketDeposit,
+      marketDepositError,
+      marketAsset,
+      loading
+    } = this.state
+    const { classes } = this.props
+
+    return (
+      <div className={ classes.addMarketContainer }>
+        <div className={ addMarketExpanded ? classes.addMarketFieldExpanded : classes.addMarketField }>
+          <TextField
+            fullWidth
+            id='marketAddress'
+            className={ classes.addMarketTextField }
+            value={ marketAddress }
+            error={ marketAddressError }
+            disabled={ loading }
+            placeholder='Token Address'
+            variant='outlined'
+            onChange={ this.onChange }
+          />
+        </div>
+        <div className={ addMarketExpanded ? classes.addMarketFieldExpanded : classes.addMarketField }>
+          { marketAsset &&
+            <div className={ classes.balances }>
+              <Typography variant='h4' onClick={ () => { this.setAmount(100) } } className={ classes.value } noWrap>{ 'Balance: '+ (marketAsset.balance ? (Math.floor(marketAsset.balance*10000)/10000).toFixed(4) : '0.0000') } { marketAsset.symbol }</Typography>
+            </div>
+          }
+          <TextField
+            fullWidth
+            id='marketDeposit'
+            className={ classes.addMarketTextField }
+            value={ marketDeposit }
+            error={ marketDepositError }
+            disabled={ loading }
+            placeholder='Deposit Amount'
+            variant='outlined'
+            onChange={ this.onChange }
+            InputProps={{
+              startAdornment: <InputAdornment position="start">
+                { marketAsset &&
+                  <img
+                    alt=""
+                    src={ this.getLogoForAsset(marketAsset) }
+                    height={ '30px' }
+                  />
+                }
+              </InputAdornment>,
+            }}
+          />
+        </div>
+        <Button
+          variant='contained'
+          className={ classes.addMarketButton }
+          color='primary'
+          onClick={ this.addmarketClicked }
+        >
+          <Typography variant='h5'>Add Market</Typography>
+        </Button>
+      </div>
+    )
+  }
 
   renderAssetBlocks = () => {
     const { assets, expanded, scAsset } = this.state
@@ -573,6 +693,61 @@ class Collateral extends Component {
     this.setState({ loading: true })
 
     dispatcher.dispatch({ type: CLAIM, content: { asset: scAsset } })
+  }
+
+  addmarketClicked = () => {
+    this.setState({ marketAddressError: false, marketDepositError: false })
+
+    const {
+      addMarketExpanded,
+      marketAddress,
+      marketDeposit,
+      marketAsset
+    } = this.state
+
+
+    if(addMarketExpanded) {
+      let error = false
+      if(!marketAddress || !Web3.utils.isAddress(marketAddress)) {
+        this.setState({ marketAddressError: true })
+        error = true
+      }
+
+      if(!marketDeposit || isNaN(marketDeposit) || marketDeposit <= 0 || marketDeposit > marketAsset.balance) {
+        error = true
+        this.setState({ marketDepositError: true })
+      }
+
+      if(!error) {
+        this.setState({ loading: true })
+        dispatcher.dispatch({ type: ADD_MARKET, content: { asset: marketAsset, amount: marketDeposit } })
+      }
+
+    } else {
+      this.setState({ addMarketExpanded: true })
+    }
+  }
+
+  setAmount = () => {
+    if(this.state.loading) {
+      return
+    }
+
+    const { marketAsset } = this.state
+    const balance = marketAsset.balance
+
+    this.setState({ marketDeposit: (Math.floor(balance*10000)/10000).toFixed(4) })
+  }
+
+  onChange = (event) => {
+    let val = []
+    val[event.target.id] = event.target.value
+    this.setState(val)
+
+    if(event.target.id === 'marketAddress' && Web3.utils.isAddress(event.target.value)) {
+      this.setState({ loading: true })
+      dispatcher.dispatch({ type: GET_MARKET_INFO, content: { address: event.target.value } })
+    }
   }
 }
 

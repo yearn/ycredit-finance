@@ -106,7 +106,7 @@ class Footer extends Component {
     return (
       <div className={classes.footer}>
         <div className={ classes.builtWith }>
-          <Typography className={ classes.builtHeading } variant={ 'h6'}>ycredit.finance</Typography>
+          <Typography className={ classes.builtHeading } variant={ 'h6'}>Stable Credit</Typography>
           <img
             alt=""
             src={ require('../../assets/YFI-logo.png') }
